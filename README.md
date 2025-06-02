@@ -1,3 +1,3 @@
 # kagi-assistant-proxy
 
-A proxy that exposes Kagi's LLM platform.
+_A proxy that exposes Kagi's LLM platform._
