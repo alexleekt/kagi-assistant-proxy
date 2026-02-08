@@ -1,5 +1,17 @@
 import json
 
+# Whitelist of known valid tags from Kagi SSE stream
+VALID_TAGS = {
+    "hi",
+    "thread_list.html",
+    "thread.html",
+    "thread_list.json",
+    "thread.json",
+    "messages.json",
+    "new_message.json",
+    "tokens.json",
+}
+
 
 def parse_kagi_sse_stream(line: bytes):
     """Parse a single line from Kagi SSE stream response."""
@@ -7,74 +19,68 @@ def parse_kagi_sse_stream(line: bytes):
         return None
 
     # Decode the line and remove null terminator
-    line_str = line.decode('utf-8').rstrip('\x00')
+    line_str = line.decode("utf-8").rstrip("\x00")
 
     if not line_str:
         return None
 
     # Split on first colon to separate tag from payload
-    parts = line_str.split(':', 1)
+    parts = line_str.split(":", 1)
     if len(parts) != 2:
         # Non-JSON data such as the threads list HTML
         return None
 
     tag, payload = parts
 
+    # Only process whitelisted tags - everything else is ignored
+    if tag not in VALID_TAGS:
+        return None
+
     try:
-        if tag == 'hi':
+        if tag == "hi":
             # hi payload is already JSON
             data = json.loads(payload)
-            return {
-                'type': 'hi',
-                'data': data,
-                'trace': data.get('trace')
-            }
+            return {"type": "hi", "data": data, "trace": data.get("trace")}
 
-        elif tag == 'thread_list.html':
+        elif tag == "thread_list.html":
             # HTML content is raw, not JSON
-            return {
-                'type': 'thread_list_html',
-                'data': payload
-            }
+            return {"type": "thread_list_html", "data": payload}
 
-        elif tag == 'thread_list.json':
-            return {
-                'type': 'thread_list_json',
-                'data': json.loads(payload)
-            }
+        elif tag == "thread.html":
+            # HTML content is raw, not JSON
+            return {"type": "thread_html", "data": payload}
 
-        elif tag == 'thread.json':
-            return {
-                'type': 'thread_json',
-                'data': json.loads(payload)
-            }
+        elif tag == "thread_list.json":
+            return {"type": "thread_list_json", "data": json.loads(payload)}
 
-        elif tag == 'messages.json':
-            return {
-                'type': 'messages_json',
-                'data': json.loads(payload)
-            }
+        elif tag == "thread.json":
+            return {"type": "thread_json", "data": json.loads(payload)}
 
-        elif tag == 'new_message.json':
+        elif tag == "messages.json":
+            return {"type": "messages_json", "data": json.loads(payload)}
+
+        elif tag == "new_message.json":
             message_data = json.loads(payload)
             return {
-                'type': 'new_message_json',
-                'data': message_data,
-                'state': message_data.get('state'),
-                'reply': message_data.get('reply'),
-                'md': message_data.get('md')
+                "type": "new_message_json",
+                "data": message_data,
+                "state": message_data.get("state"),
+                "reply": message_data.get("reply"),
+                "md": message_data.get("md"),
             }
 
-        elif tag == 'tokens.json':
+        elif tag == "tokens.json":
             token_data = json.loads(payload)
             return {
-                'type': 'tokens_json',
-                'data': token_data,
-                'text': token_data.get('text'),
-                'id': token_data.get('id')
+                "type": "tokens_json",
+                "data": token_data,
+                "text": token_data.get("text"),
+                "id": token_data.get("id"),
             }
         else:
             raise Exception(f"Unknown tag: {tag}\n{line_str}")
 
     except json.JSONDecodeError as e:
-        raise Exception(f"Failed to parse JSON for tag '{tag}': {e}\nRaw payload: {payload}")
+        raise Exception(
+            f"Failed to parse JSON for tag '{tag}': {e}\nRaw payload: {payload}"
+        )

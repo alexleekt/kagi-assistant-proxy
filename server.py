@@ -4,28 +4,30 @@ import sys
 import time
 import uuid
 
-from flask import Flask, request, Response, jsonify, stream_with_context
-
+from flask import Flask, Response, jsonify, request, stream_with_context
 from lib.auth import KagiSessionManager
 from lib.query.query import stream_query
 
 app = Flask(__name__)
 
-kagi_session_key = os.environ.get('KAGI_SESSION_KEY')
+kagi_session_key = os.environ.get("KAGI_SESSION_KEY")
 if not kagi_session_key:
-    print('Need to define your Kagi session key using the environment variable KAGI_SESSION_KEY. See README.md for more info.')
+    print(
+        "Need to define your Kagi session key using the environment variable KAGI_SESSION_KEY. See README.md for more info."
+    )
     sys.exit(1)
 kagi_session_manager = KagiSessionManager()
 kagi_session_manager.set_session_key(kagi_session_key)
 
 # Model mapping from OpenAI models to Kagi models
 MODEL_MAPPING = {
-    'gpt-4': 'gpt-4o',
-    'gpt-4-turbo': 'gpt-4o',
-    'gpt-3.5-turbo': 'gpt-4o-mini',
-    'gpt-4o': 'gpt-4o',
-    'gpt-4o-mini': 'gpt-4o-mini'
+    "openai/gpt-5-mini": "gpt-5-mini",
+    "openai/gpt-oss-120b": "gpt-oss-120b",
+    "moonshotai/kimi-k2.5": "kimi-k2-5",
 }
+
+# Default model, set to the first listed in MODEL_MAPPING
+DEFAULT_MODEL = list(MODEL_MAPPING.keys())[0]
 
 
 def create_chat_completion_chunk(content, finish_reason=None):
@@ -34,12 +36,8 @@ def create_chat_completion_chunk(content, finish_reason=None):
         "id": f"chatcmpl-{uuid.uuid4().hex[:8]}",
         "object": "chat.completion.chunk",
         "created": int(time.time()),
-        "model": request.json.get('model', 'gpt-4o-mini'),
-        "choices": [{
-            "index": 0,
-            "delta": {},
-            "finish_reason": finish_reason
-        }]
+        "model": request.json.get("model", MODEL_MAPPING.get(DEFAULT_MODEL)),
+        "choices": [{"index": 0, "delta": {}, "finish_reason": finish_reason}],
     }
 
     if content is not None:
@@ -55,19 +53,18 @@ def create_chat_completion(content, model):
         "object": "chat.completion",
         "created": int(time.time()),
         "model": model,
-        "choices": [{
-            "index": 0,
-            "message": {
-                "role": "assistant",
-                "content": content
-            },
-            "finish_reason": "stop"
-        }],
+        "choices": [
+            {
+                "index": 0,
+                "message": {"role": "assistant", "content": content},
+                "finish_reason": "stop",
+            }
+        ],
         "usage": {
             "prompt_tokens": -1,  # We don't have token counts from Kagi
             "completion_tokens": -1,
-            "total_tokens": -1
-        }
+            "total_tokens": -1,
+        },
     }
 
 
@@ -76,47 +73,50 @@ def convert_messages_to_prompt(messages):
     prompt_parts = []
 
     for message in messages:
-        role = message.get('role', 'user')
-        content = message.get('content', '')
+        role = message.get("role", "user")
+        content = message.get("content", "")
 
-        if role == 'system':
+        if role == "system":
             prompt_parts.append(f"System: {content}")
-        elif role == 'user':
+        elif role == "user":
             prompt_parts.append(f"User: {content}")
-        elif role == 'assistant':
+        elif role == "assistant":
             prompt_parts.append(f"Assistant: {content}")
 
     return "\n\n".join(prompt_parts)
 
 
-@app.route('/v1/chat/completions', methods=['POST'])
+@app.route("/v1/chat/completions", methods=["POST"])
 def chat_completions():
     try:
         # Get request data
         data = request.get_json()
 
         # Validate required fields
-        messages = data.get('messages', [])
+        messages = data.get("messages", [])
         if not messages:
-            return jsonify({
-                'error': {
-                    'message': 'messages is required',
-                    'type': 'invalid_request_error',
-                    'code': 'missing_required_parameter'
+            return jsonify(
+                {
+                    "error": {
+                        "message": "messages is required",
+                        "type": "invalid_request_error",
+                        "code": "missing_required_parameter",
+                    }
                 }
-            }), 400
+            ), 400
 
         # Get model and map it to Kagi model
-        requested_model = data.get('model', 'gpt-4o-mini')
-        kagi_model = MODEL_MAPPING.get(requested_model, requested_model)
+        requested_model = data.get("model", DEFAULT_MODEL)
+        kagi_model = MODEL_MAPPING.get(requested_model, DEFAULT_MODEL)
 
         # Convert messages to prompt
         prompt = convert_messages_to_prompt(messages)
 
         # Check if streaming is requested
-        stream = data.get('stream', False)
+        stream = data.get("stream", False)
 
         if stream:
+
             def generate():
                 try:
                     # Send initial chunk with role
@@ -128,28 +128,28 @@ def chat_completions():
                     full_content = ""
                     for chunk in stream_query(prompt, kagi_model):
                         # Parse the SSE data
-                        if chunk.startswith('data: '):
+                        if chunk.startswith("data: "):
                             chunk_data = json.loads(chunk[6:])
 
-                            if chunk_data.get('type') == 'token':
-                                content = chunk_data.get('content', '')
+                            if chunk_data.get("type") == "token":
+                                content = chunk_data.get("content", "")
                                 full_content += content
                                 response_chunk = create_chat_completion_chunk(content)
                                 yield f"data: {json.dumps(response_chunk)}\n\n"
 
-                            elif chunk_data.get('type') == 'done':
+                            elif chunk_data.get("type") == "done":
                                 # Send final chunk
                                 final_chunk = create_chat_completion_chunk(None, "stop")
                                 yield f"data: {json.dumps(final_chunk)}\n\n"
                                 yield "data: [DONE]\n\n"
                                 break
 
-                            elif chunk_data.get('error'):
+                            elif chunk_data.get("error"):
                                 error_response = {
-                                    'error': {
-                                        'message': chunk_data.get('error'),
-                                        'type': 'api_error',
-                                        'code': 'internal_error'
+                                    "error": {
+                                        "message": chunk_data.get("error"),
+                                        "type": "api_error",
+                                        "code": "internal_error",
                                     }
                                 }
                                 yield f"data: {json.dumps(error_response)}\n\n"
@@ -168,28 +168,28 @@ def chat_completions():
 
             return Response(
                 stream_with_context(generate()),
-                mimetype='text/event-stream',
+                mimetype="text/event-stream",
                 headers={
-                    'Cache-Control': 'no-cache',
-                    'X-Accel-Buffering': 'no',
-                    'Connection': 'keep-alive',
-                }
+                    "Cache-Control": "no-cache",
+                    "X-Accel-Buffering": "no",
+                    "Connection": "keep-alive",
+                },
             )
 
         else:
             # Non-streaming response
             full_content = ""
-            for chunk in stream_query(_SESSION_KEY, prompt, kagi_model):
-                if chunk.startswith('data: '):
+            for chunk in stream_query(prompt, kagi_model):
+                if chunk.startswith("data: "):
                     chunk_data = json.loads(chunk[6:])
 
-                    if chunk_data.get('type') == 'token':
-                        full_content += chunk_data.get('content', '')
+                    if chunk_data.get("type") == "token":
+                        full_content += chunk_data.get("content", "")
 
-                    elif chunk_data.get('type') == 'final':
-                        full_content = chunk_data.get('content', '')
+                    elif chunk_data.get("type") == "final":
+                        full_content = chunk_data.get("content", "")
 
-                    elif chunk_data.get('error'):
+                    elif chunk_data.get("error"):
                         print(chunk_data)
                         # return jsonify({
                         #     'error': {
@@ -212,46 +212,26 @@ def chat_completions():
         # }), 500
 
 
-@app.route('/v1/models', methods=['GET'])
+@app.route("/v1/models", methods=["GET"])
 def list_models():
     """List available models in OpenAI format"""
     models = [
         {
-            "id": "gpt-4o",
+            "id": model_id,
             "object": "model",
             "created": 1677532384,
-            "owned_by": "kagi-proxy"
-        },
-        {
-            "id": "gpt-4o-mini",
-            "object": "model",
-            "created": 1677532384,
-            "owned_by": "kagi-proxy"
-        },
-        {
-            "id": "gpt-4",
-            "object": "model",
-            "created": 1677532384,
-            "owned_by": "kagi-proxy"
-        },
-        {
-            "id": "gpt-3.5-turbo",
-            "object": "model",
-            "created": 1677532384,
-            "owned_by": "kagi-proxy"
+            "owned_by": "kagi-proxy",
         }
+        for model_id in MODEL_MAPPING.keys()
     ]
-
-    return jsonify({
-        "object": "list",
-        "data": models
-    })
+    models = sorted(models, key=lambda m: m["id"])
+    return jsonify({"object": "list", "data": models})
 
 
-@app.route('/health', methods=['GET'])
+@app.route("/health", methods=["GET"])
 def health_check():
-    return jsonify({'status': 'healthy'}), 200
+    return jsonify({"status": "healthy"}), 200
 
 
-if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+if __name__ == "__main__":
+    app.run(debug=True, host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
