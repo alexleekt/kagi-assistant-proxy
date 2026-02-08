@@ -1,0 +1,546 @@
+<!doctype html>
+<html lang="en" class="light">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>OpenAI-Compatible v1 API Tester</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <script>
+            tailwind.config = {
+                darkMode: "class",
+                theme: {
+                    extend: {},
+                },
+            };
+        </script>
+    </head>
+    <body
+        class="bg-gray-100 dark:bg-gray-900 min-h-screen py-10 px-4 transition-colors duration-200"
+    >
+        <div class="max-w-3xl mx-auto">
+            <div
+                class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 transition-colors duration-200"
+            >
+                <div class="flex justify-between items-start mb-6">
+                    <h1
+                        class="text-2xl font-bold text-gray-800 dark:text-gray-100"
+                    >
+                        OpenAI-Compatible API Tester v1
+                    </h1>
+                    <button
+                        id="themeToggle"
+                        onclick="toggleTheme()"
+                        class="p-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                        title="Toggle dark mode"
+                    >
+                        <svg
+                            id="sunIcon"
+                            class="w-5 h-5 hidden"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"
+                            ></path>
+                        </svg>
+                        <svg
+                            id="moonIcon"
+                            class="w-5 h-5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
+                            ></path>
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="mb-5">
+                    <label
+                        for="apiUrl"
+                        class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2"
+                        >API Base URL</label
+                    >
+                    <input
+                        type="text"
+                        id="apiUrl"
+                        value="http://localhost:5000"
+                        placeholder="http://localhost:5000"
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    />
+                    <small
+                        class="text-gray-500 dark:text-gray-400 text-xs block mt-1"
+                        >Endpoints will be suffixed automatically (/v1/models,
+                        /v1/chat/completions)</small
+                    >
+                </div>
+
+                <div class="mb-5">
+                    <label
+                        for="apiKey"
+                        class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2"
+                        >API Key (optional)</label
+                    >
+                    <div class="relative">
+                        <input
+                            type="text"
+                            id="apiKey"
+                            placeholder="Bearer token or API key"
+                            class="w-full px-3 py-2 pr-20 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                        />
+                        <button
+                            type="button"
+                            onclick="toggleApiKeyVisibility()"
+                            id="toggleApiKey"
+                            class="absolute right-2 top-1/2 -translate-y-1/2 bg-gray-500 hover:bg-gray-600 text-white text-xs px-3 py-1 rounded"
+                        >
+                            Hide
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex gap-4 mb-5">
+                    <div class="flex-1">
+                        <label
+                            for="modelSelect"
+                            class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2"
+                            >Model (from API)</label
+                        >
+                        <div class="relative flex items-center">
+                            <button
+                                type="button"
+                                onclick="loadModels()"
+                                class="absolute left-2 z-10 p-1 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 rounded"
+                                title="Refresh models"
+                            >
+                                <svg
+                                    class="w-4 h-4"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        stroke-width="2"
+                                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                                    ></path>
+                                </svg>
+                            </button>
+                            <select
+                                id="modelSelect"
+                                class="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                            >
+                                <option value="">-- Select a model --</option>
+                            </select>
+                        </div>
+                        <div
+                            id="modelError"
+                            class="hidden text-red-600 dark:text-red-400 text-xs mt-1"
+                        ></div>
+                    </div>
+                    <div class="flex-1">
+                        <label
+                            for="customModel"
+                            class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2"
+                            >Custom Model (optional)</label
+                        >
+                        <input
+                            type="text"
+                            id="customModel"
+                            placeholder="e.g., openai/gpt-5-mini"
+                            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                        />
+                    </div>
+                </div>
+
+                <div class="mb-5">
+                    <label
+                        for="message"
+                        class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2"
+                        >Message</label
+                    >
+                    <textarea
+                        id="message"
+                        rows="3"
+                        placeholder="Enter your message here..."
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent resize-y"
+                    >
+Hello, how are you?</textarea
+                    >
+                </div>
+
+                <div class="mb-5 flex items-center gap-2">
+                    <input
+                        type="checkbox"
+                        id="stream"
+                        class="w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500"
+                    />
+                    <label
+                        for="stream"
+                        class="text-sm text-gray-700 dark:text-gray-300"
+                        >Enable streaming</label
+                    >
+                </div>
+
+                <div class="mb-5">
+                    <button
+                        onclick="testChat()"
+                        class="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-6 rounded-md transition-colors"
+                    >
+                        Test Chat
+                    </button>
+                </div>
+
+                <div id="status" class="hidden mb-4 p-3 rounded-md"></div>
+                <pre
+                    id="output"
+                    class="hidden bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md p-4 text-xs font-mono whitespace-pre-wrap break-words max-h-96 overflow-y-auto text-gray-800 dark:text-gray-200"
+                ></pre>
+            </div>
+        </div>
+
+        <script>
+            const apiUrlInput = document.getElementById("apiUrl");
+            const apiKeyInput = document.getElementById("apiKey");
+            const modelSelect = document.getElementById("modelSelect");
+            const modelError = document.getElementById("modelError");
+            const customModelInput = document.getElementById("customModel");
+            const messageInput = document.getElementById("message");
+            const streamCheckbox = document.getElementById("stream");
+            const output = document.getElementById("output");
+            const status = document.getElementById("status");
+            const sunIcon = document.getElementById("sunIcon");
+            const moonIcon = document.getElementById("moonIcon");
+
+            function getBaseUrl() {
+                return apiUrlInput.value.trim() || "http://localhost:5000";
+            }
+
+            function getModel() {
+                return (
+                    customModelInput.value.trim() ||
+                    modelSelect.value ||
+                    "openai/gpt-5-mini"
+                );
+            }
+
+            function showStatus(message, isError = false) {
+                status.className = `mb-4 p-3 rounded-md ${isError ? "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200" : "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200"}`;
+                status.textContent = message;
+                status.classList.remove("hidden");
+            }
+
+            function clearStatus() {
+                status.className = "hidden mb-4 p-3 rounded-md";
+                status.textContent = "";
+            }
+
+            function showModelError(message) {
+                modelError.textContent = message;
+                modelError.classList.remove("hidden");
+            }
+
+            function clearModelError() {
+                modelError.textContent = "";
+                modelError.classList.add("hidden");
+            }
+
+            function updateThemeIcons() {
+                const isDark =
+                    document.documentElement.classList.contains("dark");
+                if (isDark) {
+                    sunIcon.classList.remove("hidden");
+                    moonIcon.classList.add("hidden");
+                } else {
+                    sunIcon.classList.add("hidden");
+                    moonIcon.classList.remove("hidden");
+                }
+            }
+
+            function toggleTheme() {
+                const html = document.documentElement;
+                if (html.classList.contains("dark")) {
+                    html.classList.remove("dark");
+                    html.classList.add("light");
+                    localStorage.setItem("theme", "light");
+                } else {
+                    html.classList.remove("light");
+                    html.classList.add("dark");
+                    localStorage.setItem("theme", "dark");
+                }
+                updateThemeIcons();
+            }
+
+            function initTheme() {
+                const savedTheme = localStorage.getItem("theme");
+                if (savedTheme === "dark") {
+                    document.documentElement.classList.remove("light");
+                    document.documentElement.classList.add("dark");
+                } else if (savedTheme === "light") {
+                    document.documentElement.classList.remove("dark");
+                    document.documentElement.classList.add("light");
+                } else if (
+                    window.matchMedia &&
+                    window.matchMedia("(prefers-color-scheme: dark)").matches
+                ) {
+                    document.documentElement.classList.remove("light");
+                    document.documentElement.classList.add("dark");
+                }
+                updateThemeIcons();
+            }
+
+            async function loadModels() {
+                clearModelError();
+                modelSelect.innerHTML =
+                    '<option value="">-- Loading models... --</option>';
+
+                try {
+                    const baseUrl = getBaseUrl();
+                    const headers = {};
+                    const apiKey = apiKeyInput.value.trim();
+                    if (apiKey) {
+                        headers["Authorization"] = `Bearer ${apiKey}`;
+                    }
+
+                    const response = await fetch(`${baseUrl}/v1/models`, {
+                        headers,
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(
+                            `HTTP error! status: ${response.status}`,
+                        );
+                    }
+
+                    const data = await response.json();
+                    modelSelect.innerHTML =
+                        '<option value="">-- Select a model --</option>';
+
+                    if (data.data && Array.isArray(data.data)) {
+                        data.data.forEach((model) => {
+                            const option = document.createElement("option");
+                            option.value = model.id;
+                            option.textContent = model.id;
+                            modelSelect.appendChild(option);
+                        });
+                        clearModelError();
+                    } else {
+                        showModelError("No models found in response");
+                    }
+                } catch (error) {
+                    modelSelect.innerHTML =
+                        '<option value="">-- Error loading models --</option>';
+                    showModelError(`Failed to load models: ${error.message}`);
+                    console.error("Error loading models:", error);
+                }
+            }
+
+            async function testChat() {
+                clearStatus();
+                output.classList.add("hidden");
+                output.textContent = "Sending request...";
+                output.classList.remove("hidden");
+
+                try {
+                    const baseUrl = getBaseUrl();
+                    const model = getModel();
+                    const message = messageInput.value.trim();
+                    const stream = streamCheckbox.checked;
+
+                    if (!message) {
+                        throw new Error("Please enter a message");
+                    }
+
+                    const requestBody = {
+                        model: model,
+                        messages: [{ role: "user", content: message }],
+                        stream: stream,
+                    };
+
+                    const headers = { "Content-Type": "application/json" };
+                    const apiKey = apiKeyInput.value.trim();
+                    if (apiKey) {
+                        headers["Authorization"] = `Bearer ${apiKey}`;
+                    }
+
+                    const response = await fetch(
+                        `${baseUrl}/v1/chat/completions`,
+                        {
+                            method: "POST",
+                            headers: headers,
+                            body: JSON.stringify(requestBody),
+                        },
+                    );
+
+                    if (!response.ok) {
+                        const errorData = await response.text();
+                        throw new Error(
+                            `HTTP ${response.status}: ${errorData}`,
+                        );
+                    }
+
+                    if (stream) {
+                        output.textContent = "Streaming response...\n\n";
+                        const reader = response.body.getReader();
+                        const decoder = new TextDecoder();
+                        let fullContent = "";
+
+                        while (true) {
+                            const { done, value } = await reader.read();
+                            if (done) break;
+
+                            const chunk = decoder.decode(value, {
+                                stream: true,
+                            });
+                            const lines = chunk.split("\n");
+
+                            for (const line of lines) {
+                                if (line.startsWith("data: ")) {
+                                    const data = line.slice(6);
+                                    if (data === "[DONE]") continue;
+
+                                    try {
+                                        const parsed = JSON.parse(data);
+                                        if (
+                                            parsed.choices &&
+                                            parsed.choices[0].delta
+                                        ) {
+                                            const content =
+                                                parsed.choices[0].delta.content;
+                                            if (content) {
+                                                fullContent += content;
+                                                output.textContent =
+                                                    "Streaming response...\n\n" +
+                                                    fullContent;
+                                            }
+                                        }
+                                    } catch (e) {
+                                        // Ignore parsing errors for non-JSON lines
+                                    }
+                                }
+                            }
+                        }
+
+                        output.textContent += "\n\n--- Stream Complete ---";
+                        showStatus("Stream completed successfully");
+                    } else {
+                        const data = await response.json();
+                        output.textContent = JSON.stringify(data, null, 2);
+                        showStatus("Request completed successfully");
+                    }
+                } catch (error) {
+                    output.textContent = `Error: ${error.message}`;
+                    showStatus(`Request failed: ${error.message}`, true);
+                    console.error("Error:", error);
+                }
+            }
+
+            // Load models when API URL changes
+            apiUrlInput.addEventListener("change", loadModels);
+
+            // Load models on page load
+            loadModels();
+
+            // Local storage functions
+            function saveToLocalStorage(key, value) {
+                localStorage.setItem(`openai_tester_${key}`, value);
+            }
+
+            function loadFromLocalStorage(key) {
+                return localStorage.getItem(`openai_tester_${key}`);
+            }
+
+            // Restore values from local storage
+            function restoreFromStorage() {
+                const apiUrl = loadFromLocalStorage("apiUrl");
+                const apiKey = loadFromLocalStorage("apiKey");
+                const model = loadFromLocalStorage("model");
+                const customModel = loadFromLocalStorage("customModel");
+                const stream = loadFromLocalStorage("stream");
+
+                if (apiUrl) apiUrlInput.value = apiUrl;
+                if (apiKey) apiKeyInput.value = apiKey;
+                if (model) modelSelect.value = model;
+                if (customModel) customModelInput.value = customModel;
+                if (stream) streamCheckbox.checked = stream === "true";
+            }
+
+            // Save values to local storage on change
+            apiUrlInput.addEventListener("input", () =>
+                saveToLocalStorage("apiUrl", apiUrlInput.value),
+            );
+
+            modelSelect.addEventListener("change", () =>
+                saveToLocalStorage("model", modelSelect.value),
+            );
+            customModelInput.addEventListener("input", () =>
+                saveToLocalStorage("customModel", customModelInput.value),
+            );
+            streamCheckbox.addEventListener("change", () =>
+                saveToLocalStorage("stream", streamCheckbox.checked),
+            );
+
+            // Restore values and theme on page load
+            restoreFromStorage();
+            initTheme();
+
+            let apiKeyHideTimeout = null;
+
+            function hideApiKey() {
+                const apiKeyInput = document.getElementById("apiKey");
+                const toggleBtn = document.getElementById("toggleApiKey");
+                apiKeyInput.type = "password";
+                toggleBtn.textContent = "Show";
+            }
+
+            function showApiKey() {
+                const apiKeyInput = document.getElementById("apiKey");
+                const toggleBtn = document.getElementById("toggleApiKey");
+                apiKeyInput.type = "text";
+                toggleBtn.textContent = "Hide";
+            }
+
+            function debounceHideApiKey(delay = 2000) {
+                if (apiKeyHideTimeout) {
+                    clearTimeout(apiKeyHideTimeout);
+                }
+                apiKeyHideTimeout = setTimeout(() => {
+                    hideApiKey();
+                }, delay);
+            }
+
+            function toggleApiKeyVisibility() {
+                const apiKeyInput = document.getElementById("apiKey");
+                if (apiKeyInput.type === "text") {
+                    hideApiKey();
+                    if (apiKeyHideTimeout) {
+                        clearTimeout(apiKeyHideTimeout);
+                        apiKeyHideTimeout = null;
+                    }
+                } else {
+                    showApiKey();
+                }
+            }
+
+            apiKeyInput.addEventListener("input", () => {
+                showApiKey();
+                debounceHideApiKey(2000);
+                saveToLocalStorage("apiKey", apiKeyInput.value);
+            });
+
+            setTimeout(() => {
+                hideApiKey();
+            }, 2000);
+        </script>
+    </body>
+</html>
