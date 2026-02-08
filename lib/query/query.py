@@ -1,3 +1,19 @@
+# kagi-assistant-proxy - A proxy that exposes Kagi's LLM platform
+# Copyright (C) 2024-2025  Cyberes, Alex Lee
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published
+# by the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 import json
 import logging
 
@@ -7,7 +23,7 @@ from lib.auth import KagiSessionManager
 from lib.headers import DEFAULT_HEADERS
 from lib.query.parse import parse_kagi_sse_stream
 
-_logger = logging.getLogger('SERVER').getChild('STREAM')
+_logger = logging.getLogger("SERVER").getChild("STREAM")
 
 _kagi_session_manager = KagiSessionManager()
 
@@ -16,7 +32,7 @@ def stream_query(prompt: str, model: str):
     print(prompt)
 
     headers = DEFAULT_HEADERS.copy()
-    headers['accept'] = 'application/vnd.kagi.stream'
+    headers["accept"] = "application/vnd.kagi.stream"
 
     data = {
         "focus": {
@@ -29,17 +45,23 @@ def stream_query(prompt: str, model: str):
             "personalizations": True,
             "internet_access": True,
             "model": model,
-            "lens_id": None
-        }
+            "lens_id": None,
+        },
     }
 
     cookies = {
-        'kagi_session': _kagi_session_manager.get_session_key(),
+        "kagi_session": _kagi_session_manager.get_session_key(),
     }
 
     thread_id = None
     try:
-        response = requests.post('https://kagi.com/assistant/prompt', cookies=cookies, headers=headers, json=data, stream=True)
+        response = requests.post(
+            "https://kagi.com/assistant/prompt",
+            cookies=cookies,
+            headers=headers,
+            json=data,
+            stream=True,
+        )
 
         if response.status_code == 404:
             yield f"data: {json.dumps({'error': f'Error: invalid session key', 'details': None})}\n\n"
@@ -49,11 +71,11 @@ def stream_query(prompt: str, model: str):
             return
 
         # The session key appears to rotate so we need to update it on each request
-        set_cookie_header = response.headers.get('set-cookie')
-        if set_cookie_header and 'kagi_session' in set_cookie_header:
-            p1 = set_cookie_header.split('kagi_session=')
+        set_cookie_header = response.headers.get("set-cookie")
+        if set_cookie_header and "kagi_session" in set_cookie_header:
+            p1 = set_cookie_header.split("kagi_session=")
             if len(p1) == 2:
-                p2 = p1[1].split(';')
+                p2 = p1[1].split(";")
                 if len(p2) > 2:
                     new_session_key = p2[0]
                     _kagi_session_manager.set_session_key(new_session_key)
@@ -63,21 +85,26 @@ def stream_query(prompt: str, model: str):
             if not message:
                 continue
 
-            if message['type'] == 'new_message_json' and message['state'] == 'done':
+            if message["type"] == "new_message_json" and message["state"] == "done":
                 # Send the final message
                 yield f"data: {json.dumps({'type': 'final', 'content': message['reply']})}\n\n"
 
-            if message['type'] == 'tokens_json':
+            if message["type"] == "tokens_json":
                 # Stream the tokens as they come
                 yield f"data: {json.dumps({'type': 'token', 'content': message['text']})}\n\n"
-            elif message['type'] == 'thread_json':
+            elif message["type"] == "thread_json":
                 # Save the thread ID
-                thread_id = message['data']['id']
+                thread_id = message["data"]["id"]
 
         # Delete the thread
         if thread_id:
             try:
-                requests.post('https://kagi.com/assistant/thread_delete', headers=DEFAULT_HEADERS, cookies=cookies, json={"focus": {"thread_id": thread_id}})
+                requests.post(
+                    "https://kagi.com/assistant/thread_delete",
+                    headers=DEFAULT_HEADERS,
+                    cookies=cookies,
+                    json={"focus": {"thread_id": thread_id}},
+                )
             except Exception as e:
                 # Log the error but don't fail the request
                 _logger.error(f"Failed to delete thread {thread_id}: {e}")
