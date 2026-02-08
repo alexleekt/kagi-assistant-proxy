@@ -6,57 +6,35 @@ Guide for AI coding agents working in the kagi-assistant-proxy repository.
 
 A Python Flask proxy that exposes Kagi's LLM platform via an OpenAI-compatible API.
 
-## Build / Run Commands
+## Commands
 
 ```bash
 # Install dependencies
 pip install -r requirements.txt
 
-# Run the development server
+# Run development server
 python server.py
 
-# Server will start on port 5000 (or PORT env var)
-```
-
-## Test Commands
-
-**No test framework is currently configured.** To add tests:
-
-```bash
-# Install pytest (add to requirements.txt)
-pip install pytest
-
-# Run all tests (once configured)
-pytest
-
-# Run a single test
+# Run a single test (once pytest is configured)
 pytest tests/test_specific.py::test_function_name -v
 
-# Run with coverage
-pytest --cov=lib --cov-report=term-missing
-```
+# Run all tests
+pytest
 
-## Lint/Format Commands
-
-**No linting/formatting tools configured.** Recommended setup:
-
-```bash
-# Install tools (add to requirements.txt or requirements-dev.txt)
-pip install black ruff mypy
-
-# Format code with black
+# Format code (recommended: black, ruff)
 black .
-
-# Lint with ruff (faster alternative to flake8)
 ruff check .
 
-# Type check with mypy
+# Type check (recommended: mypy)
 mypy lib/ server.py
 ```
 
-## Code Style Guidelines
+**No test/lint tools currently configured.** Add to `requirements.txt` as needed.
+
+## Code Style
 
 ### License Headers
+
 **ALL Python files must include the AGPL-3.0 license header:**
 
 ```python
@@ -80,14 +58,13 @@ mypy lib/ server.py
 ### Imports
 
 1. **Order:** Standard library → Third-party → Local modules
-2. **Group imports with blank lines between groups**
-3. **Use absolute imports** for local modules (e.g., `from lib.auth import ...`)
+2. **Group with blank lines between groups**
+3. **Use absolute imports** for local modules
 
 ```python
 # Standard library
 import json
 import os
-from datetime import datetime
 from typing import Any, Optional
 
 # Third-party
@@ -101,15 +78,15 @@ from lib.headers import DEFAULT_HEADERS
 
 ### Naming Conventions
 
-- **Functions/variables:** `snake_case` (e.g., `stream_query`, `kagi_session_key`)
+- **Functions/variables:** `snake_case` (e.g., `stream_query`)
 - **Classes:** `PascalCase` (e.g., `KagiSessionManager`)
-- **Constants:** `UPPER_SNAKE_CASE` (e.g., `DEFAULT_HEADERS`, `MODEL_MAPPING`)
-- **Private/internal:** `_leading_underscore` (e.g., `_logger`, `_kagi_session_manager`)
+- **Constants:** `UPPER_SNAKE_CASE` (e.g., `DEFAULT_HEADERS`)
+- **Private/internal:** `_leading_underscore` (e.g., `_logger`)
 
 ### String Formatting
 
-- **Use double quotes** for all strings (project convention)
-- **Use f-strings** for string formatting (Python 3.6+)
+- **Use double quotes** for all strings
+- **Use f-strings** for formatting
 
 ```python
 # Good
@@ -121,7 +98,7 @@ message = 'data: %s\n\n' % json.dumps({'type': 'token'})
 
 ### Type Hints
 
-**Use type hints** for all function signatures and important variables:
+**Use type hints** for all function signatures:
 
 ```python
 from typing import Any, Dict, List, Optional
@@ -135,9 +112,9 @@ def get_session_key(self) -> Optional[str]:
 
 ### Error Handling
 
-1. **Use try/except blocks** for external operations (HTTP requests, file I/O)
-2. **Use logging** for errors, not print statements (see `lib/query/query.py`)
-3. **Provide meaningful error messages** with context
+1. **Use try/except** for external operations (HTTP, I/O)
+2. **Use logging**, not print statements
+3. **Provide meaningful error messages**
 
 ```python
 import logging
@@ -149,14 +126,11 @@ try:
     response.raise_for_status()
 except Exception as e:
     _logger.error(f"Failed to delete thread {thread_id}: {e}")
-    # Don't re-raise if it's acceptable to continue
 ```
 
 ### Documentation
 
-1. **All public methods must have docstrings**
-2. Use Google-style docstrings (existing pattern)
-3. Include Args, Returns, and Raises sections when applicable
+**All public methods must have docstrings** using Google-style:
 
 ```python
 def set_session_key(self, key: str) -> None:
@@ -172,13 +146,11 @@ def set_session_key(self, key: str) -> None:
 
 ### Constants
 
-Define constants at module level, not inside functions:
+Define constants at module level:
 
 ```python
-# At top of file
 MODEL_MAPPING = {
     "openai/gpt-5-mini": "gpt-5-mini",
-    "openai/gpt-oss-120b": "gpt-oss-120b",
 }
 
 DEFAULT_HEADERS = {
@@ -187,21 +159,13 @@ DEFAULT_HEADERS = {
 }
 ```
 
-### Security
-
-1. **Never commit secrets** - `.env` and `mise.local.toml` are in `.gitignore`
-2. **Use environment variables** for configuration
-3. **Session keys** are managed via `KagiSessionManager` singleton
-
 ### Thread Safety
 
-The project uses threading for session management:
+Use RLock for thread-safe operations:
 
 ```python
-# Use RLock for reentrant thread-safe operations
 self._session_lock = threading.RLock()
 
-# Always acquire lock when accessing shared state
 with self._session_lock:
     return self._session_key
 ```
@@ -210,39 +174,34 @@ with self._session_lock:
 
 ```
 .
-├── server.py           # Flask application entry point
+├── server.py           # Flask entry point
 ├── lib/
-│   ├── __init__.py
-│   ├── auth.py         # KagiSessionManager (singleton)
-│   ├── headers.py      # DEFAULT_HEADERS constant
-│   ├── models.py       # Model fetching utilities
+│   ├── auth.py         # KagiSessionManager singleton
+│   ├── headers.py      # DEFAULT_HEADERS
+│   ├── mapping.py      # Model mapping utilities
+│   ├── models.py       # Model fetching
 │   └── query/
-│       ├── __init__.py
-│       ├── query.py    # stream_query() function
+│       ├── query.py    # stream_query function
 │       └── parse.py    # SSE stream parser
-├── requirements.txt    # Python dependencies
-├── .env.example        # Environment variable template
-└── README.md           # Documentation
+├── requirements.txt    # Dependencies
+└── .env.example        # Environment template
 ```
 
-## Environment Setup
+## Environment
 
 ```bash
-# Copy example environment file
+# Copy and edit environment file
 cp .env.example .env
-
-# Edit .env with your Kagi session key
-# Or use mise.local.toml for mise users
 ```
 
-**Required:** `KAGI_SESSION_KEY` - Get from kagi.com cookies (kagi_session)
+**Required:** `KAGI_SESSION_KEY` - From kagi.com cookies
 **Optional:** `PORT` - Server port (default: 5000)
 
-## Dependencies
+## Security
 
-See `requirements.txt`:
-- `requests==2.32.3` - HTTP client
-- `flask==3.1.1` - Web framework
+1. **Never commit secrets** - `.env` and `mise.local.toml` are in `.gitignore`
+2. **Use environment variables** for configuration
+3. **Session keys** managed via `KagiSessionManager` singleton
 
 ## License
 
