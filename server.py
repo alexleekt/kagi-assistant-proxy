@@ -20,10 +20,25 @@ import sys
 import time
 import uuid
 
-from flask import Flask, Response, jsonify, request, stream_with_context
+from flask import (
+    Flask,
+    Response,
+    jsonify,
+    request,
+    send_from_directory,
+    stream_with_context,
+)
 
 from lib.auth import KagiSessionManager
+from lib.mapping import DEFAULT_MODEL, MODEL_MAPPING, get_latest_model_mapping
 from lib.query.query import stream_query
+
+# Model mapping cache with 6-hour TTL
+_model_mapping_cache = {
+    "mapping": MODEL_MAPPING,
+    "timestamp": time.time() if MODEL_MAPPING else 0,
+}
+MODEL_MAPPING_CACHE_TTL = 6 * 60 * 60  # 6 hours in seconds
 
 app = Flask(__name__)
 
@@ -35,16 +50,6 @@ if not kagi_session_key:
     sys.exit(1)
 kagi_session_manager = KagiSessionManager()
 kagi_session_manager.set_session_key(kagi_session_key)
-
-# Model mapping from OpenAI models to Kagi models
-MODEL_MAPPING = {
-    "openai/gpt-5-mini": "gpt-5-mini",
-    "openai/gpt-oss-120b": "gpt-oss-120b",
-    "moonshotai/kimi-k2.5": "kimi-k2-5",
-}
-
-# Default model, set to the first listed in MODEL_MAPPING
-DEFAULT_MODEL = list(MODEL_MAPPING.keys())[0]
 
 
 def create_chat_completion_chunk(content, finish_reason=None):
@@ -232,6 +237,30 @@ def chat_completions():
 @app.route("/v1/models", methods=["GET"])
 def list_models():
     """List available models in OpenAI format"""
+    global MODEL_MAPPING
+
+    # Check if cache is stale or empty (cache for 6 hours)
+    cache_age = time.time() - _model_mapping_cache["timestamp"]
+    if cache_age > MODEL_MAPPING_CACHE_TTL or not _model_mapping_cache["mapping"]:
+        try:
+            MODEL_MAPPING = get_latest_model_mapping()
+            _model_mapping_cache["mapping"] = MODEL_MAPPING
+            _model_mapping_cache["timestamp"] = time.time()
+        except Exception as e:
+            # If fetch fails and we have cached data, return stale data
+            if _model_mapping_cache["mapping"]:
+                MODEL_MAPPING = _model_mapping_cache["mapping"]
+            else:
+                return jsonify(
+                    {
+                        "error": {
+                            "message": f"Failed to fetch models from Kagi: {str(e)}",
+                            "type": "api_error",
+                            "code": "model_fetch_failed",
+                        }
+                    }
+                ), 503
+
     models = [
         {
             "id": model_id,
@@ -248,6 +277,11 @@ def list_models():
 @app.route("/health", methods=["GET"])
 def health_check():
     return jsonify({"status": "healthy"}), 200
+
+
+@app.route("/", methods=["GET"])
+def tester():
+    return send_from_directory(".", "tester.html")
 
 
 if __name__ == "__main__":
