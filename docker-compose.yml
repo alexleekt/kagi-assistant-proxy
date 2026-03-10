@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  kagi-assistant-proxy:
+    image: ghcr.io/ksmarty/kagi-assistant-proxy:latest
+    container_name: kagi-assistant-proxy
+    ports:
+      - "${PORT:-5000}:${PORT:-5000}"
+    environment:
+      - KAGI_SESSION_KEY=${KAGI_SESSION_KEY}
+      - PORT=${PORT:-5000}
+    restart: unless-stopped
+    # Optional: add volume mounts if you want to persist data or override configs
+    # volumes:
+    #   - ./lib:/app/lib
+    #   - ./tester.html:/app/tester.html

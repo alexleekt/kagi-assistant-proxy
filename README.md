@@ -41,11 +41,93 @@ export PORT=5000  # optional, defaults to 5000
 
 ## Running
 
+### Local Development
+
 ```sh
 python server.py
 ```
 
 The proxy will be available at `http://localhost:$PORT`.
+
+### Docker
+
+#### Using Docker Compose (Recommended)
+
+The easiest way to run the proxy with Docker:
+
+```sh
+docker-compose up
+```
+
+This will:
+- Build the Docker image
+- Start the container on the configured `PORT` (default: 5000)
+- Automatically restart on failure
+
+To run in the background:
+
+```sh
+docker-compose up -d
+```
+
+To stop the container:
+
+```sh
+docker-compose down
+```
+
+#### Using Docker Directly
+
+Build the image:
+
+```sh
+docker build -t kagi-assistant-proxy .
+```
+
+Run the container:
+
+```sh
+docker run -p 5000:5000 \
+  -e KAGI_SESSION_KEY="your_session_key_here" \
+  kagi-assistant-proxy
+```
+
+Or specify a custom port:
+
+```sh
+docker run -p 8000:5000 \
+  -e KAGI_SESSION_KEY="your_session_key_here" \
+  kagi-assistant-proxy
+```
+
+### Docker Configuration
+
+The Docker image is automatically built and published to GitHub Container Registry (GHCR) on every push to `master`/`main` and on version tags.
+
+#### Pulling from GHCR
+
+```sh
+docker pull ghcr.io/ksmarty/kagi-assistant-proxy:latest
+```
+
+Or a specific version:
+
+```sh
+docker pull ghcr.io/ksmarty/kagi-assistant-proxy:v1.0.0
+```
+
+#### Environment Variables in Docker
+
+All standard environment variables work with Docker. Set them using the `-e` flag or in a `.env` file with Docker Compose:
+
+```sh
+# With docker run
+docker run -e KAGI_SESSION_KEY="your_key" kagi-assistant-proxy
+
+# With docker-compose (set in .env file)
+KAGI_SESSION_KEY="your_key"
+PORT=5000
+```
 
 ## License
 
