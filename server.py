@@ -28,6 +28,7 @@ from flask import (
     send_from_directory,
     stream_with_context,
 )
+from flask_cors import CORS
 
 from lib.auth import KagiSessionManager
 from lib.mapping import DEFAULT_MODEL, MODEL_MAPPING, get_latest_model_mapping
@@ -41,6 +42,9 @@ _model_mapping_cache = {
 MODEL_MAPPING_CACHE_TTL = 6 * 60 * 60  # 6 hours in seconds
 
 app = Flask(__name__)
+
+# Enable CORS for all routes
+CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=False)
 
 kagi_session_key = os.environ.get("KAGI_SESSION_KEY")
 if not kagi_session_key:
@@ -108,7 +112,18 @@ def convert_messages_to_prompt(messages):
     return "\n\n".join(prompt_parts)
 
 
-@app.route("/v1/chat/completions", methods=["POST"])
+@app.before_request
+def handle_preflight():
+    """Handle CORS preflight requests"""
+    if request.method == "OPTIONS":
+        response = Response()
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+        return response
+
+
+@app.route("/v1/chat/completions", methods=["POST", "OPTIONS"])
 def chat_completions():
     try:
         # Get request data
@@ -195,6 +210,9 @@ def chat_completions():
                     "Cache-Control": "no-cache",
                     "X-Accel-Buffering": "no",
                     "Connection": "keep-alive",
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+                    "Access-Control-Allow-Headers": "Content-Type, Authorization",
                 },
             )
 
@@ -234,7 +252,7 @@ def chat_completions():
         # }), 500
 
 
-@app.route("/v1/models", methods=["GET"])
+@app.route("/v1/models", methods=["GET", "OPTIONS"])
 def list_models():
     """List available models in OpenAI format"""
     global MODEL_MAPPING
@@ -274,12 +292,12 @@ def list_models():
     return jsonify({"object": "list", "data": models})
 
 
-@app.route("/health", methods=["GET"])
+@app.route("/health", methods=["GET", "OPTIONS"])
 def health_check():
     return jsonify({"status": "healthy"}), 200
 
 
-@app.route("/", methods=["GET"])
+@app.route("/", methods=["GET", "OPTIONS"])
 def tester():
     return send_from_directory(".", "tester.html")
 
